@@ -1,0 +1,14 @@
+
+
+
+Designed retrieval abstraction to support both D1-based search and Cloudflare Vectorize; Vectorize integration is feature-flagged pending account enablement.
+
+That shows:
+
+platform awareness
+
+defensive engineering
+
+real-world constraints
+
+Cloudflare engineers love that.
