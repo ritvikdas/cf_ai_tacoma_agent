@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Tacoma Manual Chat</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 0; background:#0b0f17; color:#e8eefc; }
+    header { padding: 16px 20px; border-bottom: 1px solid #1c2740; background:#0b0f17; position: sticky; top:0; }
+    header h1 { margin:0; font-size: 16px; letter-spacing: .2px; }
+    .wrap { max-width: 900px; margin: 0 auto; padding: 18px; }
+    .row { display:flex; gap:10px; flex-wrap: wrap; align-items: center; }
+    input, textarea, button {
+      border: 1px solid #223055; background:#0f1626; color:#e8eefc; border-radius: 10px;
+      padding: 10px 12px; font-size: 14px;
+    }
+    input { flex: 1; min-width: 220px; }
+    textarea { width: 100%; min-height: 90px; resize: vertical; }
+    button { cursor: pointer; background:#1b2a52; border-color:#2a3b69; }
+    button:disabled { opacity:.6; cursor:not-allowed; }
+    .chat { margin-top: 14px; display:flex; flex-direction: column; gap: 12px; }
+    .msg { padding: 12px 14px; border: 1px solid #223055; border-radius: 14px; background:#0f1626; }
+    .me { border-color:#3a4f87; background:#101b33; }
+    .label { font-size: 12px; opacity: .8; margin-bottom: 6px; }
+    .meta { font-size: 12px; opacity: .85; margin-top: 10px; }
+    .cite { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; opacity:.9; margin-top: 8px; white-space: pre-wrap; }
+    .err { border-color:#7a2b2b; background:#2a1111; }
+    .hint { opacity: .8; font-size: 12px; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Tacoma Manual Chat (Workers + D1 + optional Workers AI)</h1>
+  </header>
+
+  <div class="wrap">
+    <div class="row">
+      <input id="workerBase" placeholder="Worker base URL (e.g. https://super-wood-6e6a.ritvik2.workers.dev)" />
+      <input id="docId" placeholder="docId (optional, e.g. tacoma-manual)" />
+    </div>
+
+    <div class="hint">
+      Tip: If AI isn’t configured yet, you’ll still see retrieval matches/citations.
+    </div>
+
+    <div style="margin-top:12px;">
+      <textarea id="question" placeholder="Ask a question (e.g. How do I change the engine oil?)"></textarea>
+      <div class="row" style="margin-top:10px;">
+        <button id="sendBtn">Send</button>
+        <button id="clearBtn" type="button">Clear chat</button>
+      </div>
+    </div>
+
+    <div id="chat" class="chat"></div>
+  </div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  // Persist settings
+  const savedBase = localStorage.getItem("workerBase") || "";
+  const savedDoc  = localStorage.getItem("docId") || "";
+  $("workerBase").value = savedBase;
+  $("docId").value = savedDoc;
+
+  $("workerBase").addEventListener("change", () => localStorage.setItem("workerBase", $("workerBase").value.trim()));
+  $("docId").addEventListener("change", () => localStorage.setItem("docId", $("docId").value.trim()));
+
+  function addMsg({ who, text, citations, debug, isError }) {
+    const div = document.createElement("div");
+    div.className = "msg " + (who === "me" ? "me" : "") + (isError ? " err" : "");
+
+    const label = document.createElement("div");
+    label.className = "label";
+    label.textContent = who === "me" ? "You" : (isError ? "Error" : "Assistant");
+    div.appendChild(label);
+
+    const body = document.createElement("div");
+    body.textContent = text;
+    div.appendChild(body);
+
+    if (citations && citations.length) {
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      meta.textContent = "Citations:";
+      div.appendChild(meta);
+
+      const cite = document.createElement("div");
+      cite.className = "cite";
+      cite.textContent = citations.map(c =>
+        `[${c.id}] docId=${c.docId} loc=${c.location} chunkIndex=${c.chunkIndex}`
+      ).join("\n");
+      div.appendChild(cite);
+    }
+
+    if (debug && debug.keywords) {
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      meta.textContent = "Debug keywords: " + debug.keywords.join(", ");
+      div.appendChild(meta);
+    }
+
+    $("chat").appendChild(div);
+    div.scrollIntoView({ behavior: "smooth", block: "end" });
+  }
+
+  async function send() {
+    const base = $("workerBase").value.trim().replace(/\/+$/, "");
+    const docId = $("docId").value.trim();
+    const question = $("question").value.trim();
+
+    if (!base) {
+      addMsg({ who: "bot", text: "Set the Worker base URL first.", isError: true });
+      return;
+    }
+    if (!question) return;
+
+    addMsg({ who: "me", text: question });
+    $("question").value = "";
+
+    $("sendBtn").disabled = true;
+    try {
+      const payload = { question };
+      if (docId) payload.docId = docId;
+
+      const res = await fetch(base + "/ask", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data) {
+        addMsg({ who: "bot", text: `HTTP ${res.status} ${res.statusText}`, isError: true });
+        return;
+      }
+
+      if (!data.ok) {
+        addMsg({ who: "bot", text: data.error || "Request failed", isError: true });
+        return;
+      }
+
+      addMsg({
+        who: "bot",
+        text: data.answer || "(no answer field returned)",
+        citations: data.citations || [],
+        debug: data.debug || null,
+      });
+
+    } catch (e) {
+      addMsg({ who: "bot", text: String(e), isError: true });
+    } finally {
+      $("sendBtn").disabled = false;
+    }
+  }
+
+  $("sendBtn").addEventListener("click", send);
+  $("clearBtn").addEventListener("click", () => $("chat").innerHTML = "");
+  $("question").addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") send();
+  });
+</script>
+</body>
+</html>
