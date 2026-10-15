@@ -3,146 +3,387 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Tacoma Manual Chat</title>
+  <title>Tacoma Manual Assistant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 0; background:#0b0f17; color:#e8eefc; }
-    header { padding: 16px 20px; border-bottom: 1px solid #1c2740; background:#0b0f17; position: sticky; top:0; }
-    header h1 { margin:0; font-size: 16px; letter-spacing: .2px; }
-    .wrap { max-width: 900px; margin: 0 auto; padding: 18px; }
-    .row { display:flex; gap:10px; flex-wrap: wrap; align-items: center; }
-    input, textarea, button {
-      border: 1px solid #223055; background:#0f1626; color:#e8eefc; border-radius: 10px;
-      padding: 10px 12px; font-size: 14px;
+    :root {
+      --steel: #2b3440;
+      --steel-2: #3c4756;
+      --fog: #e9ecef;
+      --paper: #ffffff;
+      --ink: #1d232b;
+      --muted: #5e6773;
+      --rule: #cfd5db;
+      --amber: #e0a100;
+      --amber-ink: #3a2a00;
+      --amber-soft: #fff4d1;
+      --error: #a12a2a;
+      --error-soft: #fbeaea;
+      --sans: "Barlow", system-ui, sans-serif;
+      --serif: "Source Serif 4", Georgia, serif;
     }
-    input { flex: 1; min-width: 220px; }
-    textarea { width: 100%; min-height: 90px; resize: vertical; }
-    button { cursor: pointer; background:#1b2a52; border-color:#2a3b69; }
-    button:disabled { opacity:.6; cursor:not-allowed; }
-    .chat { margin-top: 14px; display:flex; flex-direction: column; gap: 12px; }
-    .msg { padding: 12px 14px; border: 1px solid #223055; border-radius: 14px; background:#0f1626; }
-    .me { border-color:#3a4f87; background:#101b33; }
-    .label { font-size: 12px; opacity: .8; margin-bottom: 6px; }
-    .meta { font-size: 12px; opacity: .85; margin-top: 10px; }
-    .cite { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; opacity:.9; margin-top: 8px; white-space: pre-wrap; }
-    .err { border-color:#7a2b2b; background:#2a1111; }
-    .hint { opacity: .8; font-size: 12px; margin-top: 8px; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      background: var(--fog);
+      color: var(--ink);
+      font: 17px/1.5 var(--sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: var(--steel);
+      color: #fff;
+      padding: 22px 16px 20px;
+    }
+    .inner { max-width: 760px; margin: 0 auto; }
+    header h1 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: 0.2px; }
+    header p { margin: 4px 0 0; color: #c3cad3; font-size: 16px; }
+
+    main { flex: 1; padding: 24px 16px 140px; }
+
+    /* Empty state */
+    .intro h2 { font-size: 20px; font-weight: 600; margin: 8px 0 6px; }
+    .intro p { margin: 0 0 16px; color: var(--muted); max-width: 60ch; }
+    .examples { display: flex; flex-wrap: wrap; gap: 8px; }
+    .examples button {
+      font: 500 15px var(--sans);
+      color: var(--steel);
+      background: var(--paper);
+      border: 1px solid var(--rule);
+      border-radius: 6px;
+      padding: 8px 12px;
+      cursor: pointer;
+      text-align: left;
+    }
+    .examples button:hover { border-color: var(--steel-2); }
+
+    /* Conversation */
+    .thread { display: flex; flex-direction: column; gap: 22px; }
+    .q {
+      align-self: flex-end;
+      max-width: 85%;
+      background: var(--steel);
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: 10px 10px 2px 10px;
+      white-space: pre-wrap;
+    }
+    .a { max-width: 100%; }
+    .a .answer { margin: 0; white-space: pre-wrap; }
+    .a.error .answer {
+      background: var(--error-soft);
+      color: var(--error);
+      border-left: 3px solid var(--error);
+      padding: 10px 14px;
+    }
+    .status { color: var(--muted); font-style: italic; }
+
+    /* Page tabs: the one bold element */
+    .tab {
+      display: inline-block;
+      font: 600 13px/1 var(--sans);
+      color: var(--amber-ink);
+      background: var(--amber);
+      border: 0;
+      border-radius: 3px;
+      padding: 4px 6px 3px;
+      margin: 0 2px;
+      vertical-align: 2px;
+      cursor: pointer;
+    }
+    .tab[aria-pressed="true"] { outline: 2px solid var(--steel); outline-offset: 1px; }
+
+    .sources { margin-top: 14px; }
+    .sources-head { font-size: 14px; color: var(--muted); margin-bottom: 6px; }
+    .source-list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .source-list .tab { margin: 0; vertical-align: baseline; padding: 6px 8px 5px; }
+
+    .excerpt {
+      position: relative;
+      margin-top: 12px;
+      background: var(--paper);
+      border: 1px solid var(--rule);
+      border-top: 4px solid var(--amber);
+      padding: 36px 20px 34px;
+      font: 16px/1.65 var(--serif);
+      color: #2a2f36;
+      max-width: 68ch;
+      box-shadow: 0 1px 0 var(--rule), 0 3px 0 -1px var(--paper), 0 4px 0 -1px var(--rule);
+    }
+    .excerpt .folio {
+      position: absolute;
+      right: 16px;
+      bottom: 10px;
+      font: 600 13px var(--sans);
+      color: var(--muted);
+    }
+    .excerpt .close {
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      background: none;
+      border: 0;
+      font: 500 14px var(--sans);
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .check { margin-top: 14px; padding: 10px 14px; background: var(--amber-soft); border-radius: 6px; }
+    .check h3 { margin: 0 0 4px; font-size: 15px; font-weight: 600; }
+    .check ul { margin: 0; padding-left: 20px; }
+
+    /* Composer */
+    .composer {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      background: linear-gradient(to top, var(--fog) 75%, rgba(233,236,239,0));
+      padding: 18px 16px 14px;
+    }
+    form { display: flex; gap: 8px; align-items: flex-end; }
+    textarea {
+      flex: 1;
+      font: 17px/1.4 var(--sans);
+      color: var(--ink);
+      background: var(--paper);
+      border: 1px solid var(--rule);
+      border-radius: 8px;
+      padding: 11px 12px;
+      resize: none;
+      min-height: 48px;
+      max-height: 160px;
+    }
+    textarea:focus { border-color: var(--steel-2); outline: none; box-shadow: 0 0 0 3px rgba(43,52,64,0.15); }
+    .send {
+      font: 600 16px var(--sans);
+      color: #fff;
+      background: var(--steel);
+      border: 0;
+      border-radius: 8px;
+      padding: 0 18px;
+      height: 48px;
+      cursor: pointer;
+    }
+    .send:disabled { opacity: 0.55; cursor: default; }
+    .fine { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+    .fine a { color: var(--steel); }
+
+    button:focus-visible, .tab:focus-visible { outline: 2px solid var(--steel); outline-offset: 2px; }
+
+    @media (max-width: 520px) {
+      body { font-size: 16px; }
+      header h1 { font-size: 22px; }
+      .q { max-width: 92%; }
+      .fine .why { display: none; }
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      .excerpt { animation: open 160ms ease-out; }
+      @keyframes open { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+    }
   </style>
 </head>
 <body>
   <header>
-    <h1>Tacoma Manual Chat (Workers + D1 + optional Workers AI)</h1>
+    <div class="inner">
+      <h1>Tacoma Manual Assistant</h1>
+      <p>Ask about your truck. Answers come only from the Toyota Tacoma owner's manual, with the pages they came from.</p>
+    </div>
   </header>
 
-  <div class="wrap">
-    <div class="hint">
-      Connected to <b>super-wood-6e6a</b>  docId: <b>tacoma-manual</b><br/>
-      Tip: If AI isn’t configured yet, you’ll still see retrieval matches/citations.
+  <main>
+    <div class="inner">
+      <section class="intro" id="intro">
+        <h2>Try a question</h2>
+        <p>Tap a page tab in any answer to read that part of the manual.</p>
+        <div class="examples">
+          <button type="button">How do I check the engine oil level?</button>
+          <button type="button">What is the engine oil capacity?</button>
+          <button type="button">What does the tire pressure warning light mean?</button>
+          <button type="button">How do I shift into 4WD?</button>
+        </div>
+      </section>
+      <div class="thread" id="thread" aria-live="polite"></div>
     </div>
+  </main>
 
-    <div style="margin-top:12px;">
-      <textarea id="question" placeholder="Ask a question (e.g. How do I change the engine oil?)"></textarea>
-      <div class="row" style="margin-top:10px;">
-        <button id="sendBtn">Send</button>
-        <button id="clearBtn" type="button">Clear chat</button>
-      </div>
+  <div class="composer">
+    <div class="inner">
+      <form id="form">
+        <label for="question" class="sr" hidden>Your question</label>
+        <textarea id="question" rows="1" placeholder="Ask a question" autocomplete="off"></textarea>
+        <button class="send" id="send" type="submit">Ask</button>
+      </form>
+      <p class="fine"><span class="why">Built with Cloudflare Workers, D1, and Workers AI. </span><a href="https://github.com/ritvikdas/cf_ai_tacoma_agent" target="_blank" rel="noopener">Source code</a></p>
     </div>
-
-    <div id="chat" class="chat"></div>
   </div>
 
 <script>
-  const $ = (id) => document.getElementById(id);
+  const API = "https://super-wood-6e6a.ritvik2.workers.dev";
+  const DOC_ID = "tacoma-manual";
 
-  // Hardcoded defaults (no user setup required)
-  const BASE_URL = "https://super-wood-6e6a.ritvik2.workers.dev";
-  const DOC_ID   = "tacoma-manual";
+  const thread = document.getElementById("thread");
+  const intro = document.getElementById("intro");
+  const form = document.getElementById("form");
+  const input = document.getElementById("question");
+  const sendBtn = document.getElementById("send");
 
-  function addMsg({ who, text, citations, debug, isError }) {
-    const div = document.createElement("div");
-    div.className = "msg " + (who === "me" ? "me" : "") + (isError ? " err" : "");
-
-    const label = document.createElement("div");
-    label.className = "label";
-    label.textContent = who === "me" ? "You" : (isError ? "Error" : "Assistant");
-    div.appendChild(label);
-
-    const body = document.createElement("div");
-    body.textContent = text;
-    div.appendChild(body);
-
-    if (citations && citations.length) {
-      const meta = document.createElement("div");
-      meta.className = "meta";
-      meta.textContent = "Citations:";
-      div.appendChild(meta);
-
-      const cite = document.createElement("div");
-      cite.className = "cite";
-      cite.textContent = citations.map(c =>
-        `[${c.id}] docId=${c.docId} loc=${c.location} chunkIndex=${c.chunkIndex}`
-      ).join("\n");
-      div.appendChild(cite);
-    }
-
-    if (debug && debug.keywords) {
-      const meta = document.createElement("div");
-      meta.className = "meta";
-      meta.textContent = "Debug keywords: " + debug.keywords.join(", ");
-      div.appendChild(meta);
-    }
-
-    $("chat").appendChild(div);
-    div.scrollIntoView({ behavior: "smooth", block: "end" });
+  function el(tag, cls, text) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
   }
 
-  async function send() {
-    const question = $("question").value.trim();
-    if (!question) return;
+  function pageLabel(c) {
+    return c && c.page != null ? "p. " + c.page : "source " + (c ? c.id : "?");
+  }
 
-    addMsg({ who: "me", text: question });
-    $("question").value = "";
+  // Render answer text, turning [1] / SOURCE [1] into clickable page tabs
+  function renderAnswer(target, text, byId, openExcerpt) {
+    const clean = String(text || "").replace(/SOURCE\s*\[/gi, "[");
+    const parts = clean.split(/(\[\d+\](?:\s*,?\s*\[\d+\])*)/g);
+    for (const part of parts) {
+      const ids = part.match(/\d+/g);
+      if (/^\[\d+\]/.test(part) && ids) {
+        ids.forEach(id => {
+          const c = byId.get(Number(id));
+          if (!c) return;
+          const b = el("button", "tab", pageLabel(c));
+          b.type = "button";
+          b.setAttribute("aria-pressed", "false");
+          b.setAttribute("aria-label", "Show manual " + pageLabel(c));
+          b.addEventListener("click", () => openExcerpt(c, b));
+          target.appendChild(b);
+        });
+      } else if (part) {
+        target.appendChild(document.createTextNode(part));
+      }
+    }
+  }
 
-    $("sendBtn").disabled = true;
+  function addQuestion(text) {
+    intro.hidden = true;
+    thread.appendChild(el("div", "q", text));
+  }
+
+  function addPending() {
+    const a = el("div", "a");
+    a.appendChild(el("p", "answer status", "Searching the manual..."));
+    thread.appendChild(a);
+    a.scrollIntoView({ behavior: "smooth", block: "end" });
+    return a;
+  }
+
+  function showError(a, msg) {
+    a.className = "a error";
+    a.replaceChildren(el("p", "answer", msg));
+  }
+
+  function showAnswer(a, data) {
+    a.replaceChildren();
+    const citations = (data.citations || []).filter(c => c.snippet || c.page != null);
+    const byId = new Map(citations.map(c => [c.id, c]));
+
+    let excerptBox = null, activeTab = null;
+    function openExcerpt(c, tab) {
+      if (activeTab) activeTab.setAttribute("aria-pressed", "false");
+      if (excerptBox && activeTab === tab) { excerptBox.remove(); excerptBox = null; activeTab = null; return; }
+      if (excerptBox) excerptBox.remove();
+      excerptBox = el("div", "excerpt");
+      const close = el("button", "close", "Close");
+      close.type = "button";
+      close.addEventListener("click", () => { excerptBox.remove(); excerptBox = null; tab.setAttribute("aria-pressed", "false"); activeTab = null; });
+      excerptBox.append(close, el("div", null, (c.snippet || "No excerpt available.") + (c.snippet && c.snippet.length >= 700 ? "..." : "")));
+      excerptBox.appendChild(el("span", "folio", pageLabel(c)));
+      a.appendChild(excerptBox);
+      tab.setAttribute("aria-pressed", "true");
+      activeTab = tab;
+      excerptBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    const p = el("p", "answer");
+    renderAnswer(p, data.answer || "No answer came back. Try rephrasing the question.", byId, openExcerpt);
+    a.appendChild(p);
+
+    const next = (data.manual_next || []).filter(Boolean);
+    if (next.length) {
+      const box = el("div", "check");
+      box.appendChild(el("h3", null, "Also check in the manual"));
+      const ul = el("ul");
+      next.forEach(t => ul.appendChild(el("li", null, t)));
+      box.appendChild(ul);
+      a.appendChild(box);
+    }
+
+    if (citations.length) {
+      const s = el("div", "sources");
+      s.appendChild(el("div", "sources-head", "Pages searched"));
+      const list = el("div", "source-list");
+      const seen = new Set();
+      citations.forEach(c => {
+        const key = pageLabel(c);
+        if (seen.has(key)) return;
+        seen.add(key);
+        const b = el("button", "tab", key);
+        b.type = "button";
+        b.setAttribute("aria-pressed", "false");
+        b.addEventListener("click", () => openExcerpt(c, b));
+        list.appendChild(b);
+      });
+      s.appendChild(list);
+      a.appendChild(s);
+    }
+  }
+
+  async function ask(question) {
+    addQuestion(question);
+    const a = addPending();
+    sendBtn.disabled = true;
     try {
-      const payload = { question, docId: DOC_ID };
-
-      const res = await fetch(BASE_URL + "/ask", {
+      const res = await fetch(API + "/ask", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ question, docId: DOC_ID }),
       });
-
       const data = await res.json().catch(() => null);
-
-      if (!res.ok || !data) {
-        addMsg({ who: "bot", text: `HTTP ${res.status} ${res.statusText}`, isError: true });
-        return;
-      }
-
-      if (!data.ok) {
-        addMsg({ who: "bot", text: data.error || "Request failed", isError: true });
-        return;
-      }
-
-      addMsg({
-        who: "bot",
-        text: data.answer || "(no answer field returned)",
-        citations: data.citations || [],
-        debug: data.debug || null,
-      });
-
+      if (!data) return showError(a, "The server sent back something unreadable (status " + res.status + "). Try again in a moment.");
+      if (!data.ok) return showError(a, data.error === "Could not extract keywords"
+        ? "That question is too short to search. Add a detail, like the part or warning light."
+        : (data.error || "The request failed.") + " Try again in a moment.");
+      showAnswer(a, data);
     } catch (e) {
-      addMsg({ who: "bot", text: String(e), isError: true });
+      showError(a, "Couldn't reach the assistant. Check your connection and try again.");
     } finally {
-      $("sendBtn").disabled = false;
+      sendBtn.disabled = false;
+      input.focus();
     }
   }
 
-  $("sendBtn").addEventListener("click", send);
-  $("clearBtn").addEventListener("click", () => $("chat").innerHTML = "");
-  $("question").addEventListener("keydown", (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") send();
+  function submit() {
+    const q = input.value.trim();
+    if (!q || sendBtn.disabled) return;
+    input.value = "";
+    autosize();
+    ask(q);
+  }
+
+  function autosize() {
+    input.style.height = "auto";
+    input.style.height = Math.min(input.scrollHeight, 160) + "px";
+  }
+
+  form.addEventListener("submit", e => { e.preventDefault(); submit(); });
+  input.addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); }
   });
+  input.addEventListener("input", autosize);
+  document.querySelectorAll(".examples button").forEach(b =>
+    b.addEventListener("click", () => { input.value = b.textContent; submit(); })
+  );
 </script>
 </body>
 </html>
